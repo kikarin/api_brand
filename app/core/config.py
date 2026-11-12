@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     r2_secret_access_key: str = ""
     r2_bucket: str = "brand-mockups"
     r2_public_base_url: str = ""
+    # Base publik untuk /local-media (contoh: http://103.31.204.10). Kosong = path relatif.
+    public_api_base_url: str = ""
     cf_images_account_hash: str = ""
     secret_key: str = "change-me"
     # studio-web :3000 · fitting-web :3001 · ecom-web :3002

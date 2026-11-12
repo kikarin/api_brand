@@ -148,12 +148,6 @@ async def create_etalase(
     sku: str | None = Form(default=None),
     branch_id: UUID | None = Form(default=None),
 ) -> EtalaseProductOut:
-    if not r2_service.r2_configured():
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="R2 is not configured on the server",
-        )
-
     data = await file.read()
     content_type, ext = _read_and_validate_image(file, data)
     _assert_branch(db, branch_id, current.brand_id)
@@ -167,7 +161,7 @@ async def create_etalase(
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Failed to upload to R2",
+            detail="Failed to store image",
         ) from exc
 
     template_key = prompt_templates.template_key_for_category(category.value)
@@ -278,12 +272,6 @@ async def replace_etalase_image(
     db: DbSession,
     file: UploadFile = File(...),
 ) -> EtalaseProductOut:
-    if not r2_service.r2_configured():
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="R2 is not configured on the server",
-        )
-
     row = _get_owned(db, product_id, current.brand_id)
     data = await file.read()
     content_type, ext = _read_and_validate_image(file, data)
@@ -294,7 +282,7 @@ async def replace_etalase_image(
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Failed to upload to R2",
+            detail="Failed to store image",
         ) from exc
 
     row.image_r2_key = new_key

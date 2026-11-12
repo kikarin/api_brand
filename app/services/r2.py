@@ -76,29 +76,35 @@ def _local_path(key: str) -> Path:
 
 
 def _local_media_url(key: str) -> str:
-    return f"http://127.0.0.1:8000/local-media/{key}"
+    """URL untuk file di disk. Relative biar FE (Vercel) bisa rewrite same-origin."""
+    settings = get_settings()
+    base = (settings.public_api_base_url or "").rstrip("/")
+    if base:
+        return f"{base}/local-media/{key}"
+    return f"/local-media/{key}"
 
 
 def upload_bytes(*, key: str, data: bytes, content_type: str) -> None:
+    """Simpan lokal selalu; R2 best-effort jika kredensial ada."""
     settings = get_settings()
-    if r2_configured(settings) and _client() is not None:
-        _client().put_object(
-            Bucket=settings.r2_bucket,
-            Key=key,
-            Body=data,
-            ContentType=content_type,
-        )
-        # Mirror lokal biar preview tetap bisa kalau public URL belum diset
-        target = _local_path(key)
-        target.write_bytes(data)
-        meta = target.with_suffix(target.suffix + ".ctype")
-        meta.write_text(content_type or "application/octet-stream", encoding="utf-8")
-        return
-
     target = _local_path(key)
     target.write_bytes(data)
     meta = target.with_suffix(target.suffix + ".ctype")
     meta.write_text(content_type or "application/octet-stream", encoding="utf-8")
+
+    if r2_configured(settings) and _client() is not None:
+        try:
+            _client().put_object(
+                Bucket=settings.r2_bucket,
+                Key=key,
+                Body=data,
+                ContentType=content_type,
+            )
+        except Exception:
+            logger.exception("r2_put_failed key=%s — kept local copy only", key)
+            return
+        return
+
     logger.info("local_upload key=%s bytes=%s", key, len(data))
 
 
@@ -123,12 +129,13 @@ def delete_object(key: str) -> None:
 def resolve_image_url(key: str, *, expires_in: int = 3600) -> str:
     settings = get_settings()
 
-    # Legacy/dev: file hanya ada lokal → jangan arahkan ke R2 kosong
-    if local_exists(key):
-        return _local_media_url(key)
-
+    # CDN / public bucket R2 — prioritas tertinggi (aman di HTTPS Vercel)
     if settings.r2_public_base_url:
         return f"{settings.r2_public_base_url.rstrip('/')}/{key}"
+
+    # File ada di disk server (seed / mirror) → local-media (relative atau PUBLIC_API_BASE_URL)
+    if local_exists(key):
+        return _local_media_url(key)
 
     if r2_configured(settings) and _client() is not None:
         return _client().generate_presigned_url(
