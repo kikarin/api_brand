@@ -159,9 +159,10 @@ async def create_etalase(
     try:
         r2_service.upload_bytes(key=key, data=data, content_type=content_type)
     except Exception as exc:  # noqa: BLE001
+        logger.exception("etalase_store_failed key=%s", key)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Failed to store image",
+            detail=f"Failed to store image: {exc}",
         ) from exc
 
     template_key = prompt_templates.template_key_for_category(category.value)
