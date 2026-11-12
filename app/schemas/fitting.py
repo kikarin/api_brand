@@ -77,7 +77,7 @@ class PublicVisitOut(BaseModel):
 
 
 class PublicWishlistCreate(BaseModel):
-    product_ids: list[UUID] = Field(min_length=1, max_length=8)
+    product_ids: list[UUID] = Field(min_length=1)
     branch_id: UUID | None = None
     ttl_minutes: int = Field(default=30, ge=5, le=240)
 
